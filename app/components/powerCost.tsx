@@ -207,95 +207,35 @@ const PowerCost: React.FC<powerProps> = ({
           )}
         </div>
       )}
-      <div className="flex w-full flex-wrap text-center justify-center px-4">
-        <div className="flex flex-row justify-center items-center w-full md:w-[400px] border-lime-500 bg-lime-100 border-2 font-bold py-1 px-4 rounded-lg mt-4 shadow md:mr-5 relative">
-          <div>
-            Energy Cost (Year): $
-            {costOfPower.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-          </div>
-          <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-3 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-            i
-          </div>
-          <span
-            className="z-10 infobox display-on-hover absolute top-[-90px] xxxs:top-[-80px] xxs:top-[-62px] xs:top-[-65px] sm:top-[-90px] md:top-[-90px] xl:top-[-90px] 2xl:top-[-90px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-            style={{
-              width: "calc(95%)", // Full width minus 20px margin on each side
-              maxWidth: "1200px", // Maximum width to match the original design
-            }}
-          >
-            <span className="font-bold" style={{ color: "#ccff33" }}>
-              Energy Cost
-            </span>{" "}
-            represents the spending for a whole year of operation based on the
-            Total Average Consumption.
+      <div className="flex w-full flex-wrap justify-center gap-3 px-4">
+        <div className="flex items-center justify-center w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-400 rounded-xl shadow-sm font-semibold relative group">
+          <span className="text-yellow-600 mr-2">Energy Cost (Year):</span>
+          <span className="text-yellow-800">${costOfPower.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+          <div className="flex items-center justify-center w-4 h-4 ml-2 rounded-full bg-yellow-200 text-[10px] text-yellow-700 cursor-help hover:bg-yellow-300 transition-colors">i</div>
+          <span className="z-10 hidden group-hover:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-72 p-3 text-white bg-slate-700 text-xs rounded-lg shadow-lg">
+            <span className="font-bold text-yellow-300">Energy Cost</span> represents the spending for a whole year of operation based on the Total Average Consumption.
           </span>
         </div>
-        <div className="flex flex-row w-full md:w-[520px] border-fuchsia-500 bg-fuchsia-100 border-2 font-bold py-1 px-4 rounded-lg mt-4 shadow md:mr-5 justify-center items-center relative">
-          <div>
-            Server Average & Peak Consumption:{" "}
-            {(avgCons * spue).toLocaleString("en-US", {
-              maximumFractionDigits: 0,
-            })}{" "}
-            W - {"  "}
-            {(serverConsumption * spue).toLocaleString("en-US", {
-              maximumFractionDigits: 0,
-            })}{" "}
-            W
-          </div>
-          <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-3 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-            i
-          </div>
-          <span
-            className="z-10 infobox display-on-hover absolute top-[-285px] xxxs:top-[-215px] xxs:top-[-210px] xs:top-[-175px] sm:top-[-210px] md:top-[-210px] lg:top-[-210px] xl:top-[-210px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-            style={{
-              width: "calc(90%)", // Full width minus 20px margin on each side
-              maxWidth: "1200px", // Maximum width to match the original design
-            }}
-          >
-            <span className="font-bold" style={{ color: "#ccff33" }}>
-              Peak Server consumption{" "}
-            </span>{" "}
-            represents the peak power consumption with all servers running at
-            full utilization.
-            <br />
-            <span className="font-bold" style={{ color: "#ccff33" }}>
-              Average Server consumption
-            </span>{" "}
-            is a more realistic estimation of power consumption, considering
-            that in a data center, servers are usually running at lower
-            utilization.
-            <br />
-            <br />
-            It is important to have both so the power infrastructure can be
-            provisioned to support peak server consumption while also having a
-            realistic estimation of the energy spending.
+        <div className="flex items-center justify-center w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-400 rounded-xl shadow-sm font-semibold relative group">
+          <span className="text-yellow-600 mr-2">Server Avg & Peak:</span>
+          <span className="text-yellow-800">
+            {(avgCons * spue).toLocaleString("en-US", { maximumFractionDigits: 0 })} W - {(serverConsumption * spue).toLocaleString("en-US", { maximumFractionDigits: 0 })} W
+          </span>
+          <div className="flex items-center justify-center w-4 h-4 ml-2 rounded-full bg-yellow-200 text-[10px] text-yellow-700 cursor-help hover:bg-yellow-300 transition-colors">i</div>
+          <span className="z-10 hidden group-hover:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-80 p-3 text-white bg-slate-700 text-xs rounded-lg shadow-lg">
+            <span className="font-bold text-yellow-300">Peak Server consumption</span> represents the peak power consumption with all servers running at full utilization.
+            <br /><br />
+            <span className="font-bold text-yellow-300">Average Server consumption</span> is a more realistic estimation considering servers usually run at lower utilization.
           </span>
         </div>
-
-        <div className="flex flex-row justify-center items-center w-full md:w-[400px] border-teal-500 bg-teal-100 border-2 font-bold py-1 px-4 rounded-lg mt-4 shadow relative">
-          <div>
-            Total Average Consumption:{" "}
-            {((spue * avgCons + netConsumption) * pue).toLocaleString("en-US", {
-              maximumFractionDigits: 0,
-            })}{" "}
-            W
-          </div>
-          <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-3 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-            i
-          </div>
-          <span
-            className="z-10 infobox display-on-hover absolute top-[-110px] xxxs:top-[-90px] xxs:top-[-82px] xs:top-[-75px] sm:top-[-110px] md:top-[-110px] xl:top-[-110px] xxl:top-[-120px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-            style={{
-              width: "calc(95%)", // Full width minus 20px margin on each side
-              maxWidth: "1200px", // Maximum width to match the original design
-            }}
-          >
-            <span className="font-bold" style={{ color: "#ccff33" }}>
-              Total Average Consumption
-            </span>{" "}
-            represents the average consumption of the entire data center. It's
-            influenced by the PUE set in the Power Distribution and Cooling
-            Infrastructure section.
+        <div className="flex items-center justify-center w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-400 rounded-xl shadow-sm font-semibold relative group">
+          <span className="text-yellow-600 mr-2">Total Avg Consumption:</span>
+          <span className="text-yellow-800">
+            {((spue * avgCons + netConsumption) * pue).toLocaleString("en-US", { maximumFractionDigits: 0 })} W
+          </span>
+          <div className="flex items-center justify-center w-4 h-4 ml-2 rounded-full bg-yellow-200 text-[10px] text-yellow-700 cursor-help hover:bg-yellow-300 transition-colors">i</div>
+          <span className="z-10 hidden group-hover:block absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-72 p-3 text-white bg-slate-700 text-xs rounded-lg shadow-lg">
+            <span className="font-bold text-yellow-300">Total Average Consumption</span> represents the average consumption of the entire data center, influenced by the PUE setting.
           </span>
         </div>
       </div>
@@ -315,13 +255,13 @@ const PowerCost: React.FC<powerProps> = ({
                 max={99}
                 sx={{
                   "& .MuiSlider-thumb": {
-                    color: "#38b2ac", // Tailwind teal 500 color
+                    color: "#eab308", // Tailwind yellow-500
                   },
                   "& .MuiSlider-track": {
-                    color: "#38b2ac", // Tailwind teal 500 color
+                    color: "#eab308", // Tailwind yellow-500
                   },
                   "& .MuiSlider-rail": {
-                    color: "lightgray", // Light gray track color
+                    color: "#fef9c3", // Tailwind yellow-100
                   },
                   height: 7,
                 }}

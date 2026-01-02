@@ -300,16 +300,14 @@ const Labor: React.FC<laborProps> = ({
           ))}
         </div>
       )}
-      <div className="flex w-full flex-wrap text-center justify-center ">
-        <div className="w-full sm:w-[400px] border-cyan-500 bg-cyan-100 border-2 font-bold py-1 px-4 rounded-lg mt-4 shadow md:mr-5">
-          Total (Base salary) Labor Cost: $
-          {totalBaseLaborCost.toLocaleString("en-US", {
-            maximumFractionDigits: 0,
-          })}
+      <div className="flex w-full flex-wrap justify-center gap-3 mt-4">
+        <div className="flex items-center justify-center w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-300 rounded-xl shadow-sm font-semibold">
+          <span className="text-indigo-600 mr-2">Base Salary Cost:</span>
+          <span className="text-indigo-800">${totalBaseLaborCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         </div>
-        <div className="w-full sm:w-[400px] border-green-500 bg-green-100 border-2 font-bold py-1 px-4 rounded-lg mt-4 shadow">
-          Total Compensation Cost: $
-          {totalLaborCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+        <div className="flex items-center justify-center w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-300 rounded-xl shadow-sm font-semibold">
+          <span className="text-indigo-600 mr-2">Total Compensation:</span>
+          <span className="text-indigo-800">${totalLaborCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
     </div>

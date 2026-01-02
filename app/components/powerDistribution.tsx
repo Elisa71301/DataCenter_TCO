@@ -234,9 +234,9 @@ const PowerDistribution: React.FC<powerProps> = ({
           <option value="air">Air</option>
         </select>
       </div>
-      <div className="w-full md:w-[610px] xl:w-[450px] border-cyan-500 bg-cyan-100 border-2 font-bold py-1 px-3 rounded-lg mt-4 shadow ml-4 mr-4 md:mr-[10px]">
-        Power Distribution & Cooling cost: $
-        {pdCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+      <div className="flex items-center justify-center w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-400 rounded-xl shadow-sm font-semibold mt-4 ml-4 mr-4">
+        <span className="text-yellow-600 mr-2">Power Distribution & Cooling:</span>
+        <span className="text-yellow-800">${pdCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
       </div>
       <div className="flex flex-col space-y-1 w-full sm:w-[700px] mb-2 mt-7 sm:mr-[50px] ml-4 items-center mr-4">
         <Box sx={{ width: "100%" }}>
@@ -254,13 +254,13 @@ const PowerDistribution: React.FC<powerProps> = ({
                 max={99}
                 sx={{
                   "& .MuiSlider-thumb": {
-                    color: "#38b2ac", // Tailwind teal 500 color
+                    color: "#eab308", // Tailwind yellow-500
                   },
                   "& .MuiSlider-track": {
-                    color: "#38b2ac", // Tailwind teal 500 color
+                    color: "#eab308", // Tailwind yellow-500
                   },
                   "& .MuiSlider-rail": {
-                    color: "lightgray", // Light gray track color
+                    color: "#fef9c3", // Tailwind yellow-100
                   },
                   height: 7,
                 }}

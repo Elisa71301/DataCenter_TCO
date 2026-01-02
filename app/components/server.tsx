@@ -452,15 +452,18 @@ const Server: React.FC<ServerProps> = ({
               <option value="amd_bergamo">AMD EPYC Bergamo</option>
               <option value="amd_milan">AMD EPYC Milan</option>
             </select>
-            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto">
-              <div className="w-full sm:w-[285px] border-green-500 bg-green-100 border-2 font-bold py-1 px-3 rounded-lg shadow mb-2 sm:mr-[50px]">
-                Total Cores: {totalCores}
+            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto gap-2">
+              <div className="flex items-center justify-center w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Cores:</span>
+                <span className="text-emerald-800">{totalCores}</span>
               </div>
-              <div className="w-full sm:w-[285px] border-sky-500 bg-sky-100 border-2 font-bold py-1 px-3 rounded-lg shadow mb-2 sm:mr-[50px]">
-                Total Mem: {totalRam} GB
+              <div className="flex items-center justify-center w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Memory:</span>
+                <span className="text-emerald-800">{totalRam} GB</span>
               </div>
-              <div className="w-full sm:w-[285px] border-red-500 border-2 bg-red-100 font-bold py-1 px-3 rounded-lg shadow mb-2 sm:mr-[50px]">
-                Total Storage: {totalStorage} GB
+              <div className="flex items-center justify-center w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Storage:</span>
+                <span className="text-emerald-800">{totalStorage} GB</span>
               </div>
             </div>
           </div>
@@ -652,14 +655,10 @@ const Server: React.FC<ServerProps> = ({
                 </div>
               </>
             )}
-            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto">
-              <div
-                className={`w-full sm:w-[550px] border-greenish bg-yellowish bg-opacity-40 border-2 font-bold py-1 px-3 rounded-lg shadow mt-3 md:mr-[180px]`}
-              >
-                Total Cluster Cost: $
-                {totalClusterCost.toLocaleString("en-US", {
-                  maximumFractionDigits: 0,
-                })}
+            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto mt-3">
+              <div className="flex items-center justify-center w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Total Cluster Cost:</span>
+                <span className="text-emerald-800 text-lg">${totalClusterCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
           </div>
@@ -817,25 +816,24 @@ const Server: React.FC<ServerProps> = ({
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto">
-              <div className="w-full md:w-[285px] border-green-500 bg-green-100 border-2 font-bold py-1 px-3 rounded-lg shadow mb-4 mt-3 md:mr-[30px] ">
-                Total Cores: {totalClusterCore}
+            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto gap-2 mt-3 mb-2">
+              <div className="flex items-center justify-center w-full md:w-auto px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Cores:</span>
+                <span className="text-emerald-800">{totalClusterCore}</span>
               </div>
-              <div className="w-full md:w-[285px] border-sky-500 bg-sky-100 border-2 font-bold py-1 px-3 rounded-lg shadow mb-4 mt-3 md:mr-[30px] ">
-                Total Mem: {totalRam} GB
+              <div className="flex items-center justify-center w-full md:w-auto px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Memory:</span>
+                <span className="text-emerald-800">{totalRam} GB</span>
               </div>
-              <div className="w-full md:w-[285px] border-teal-500 border-2 bg-teal-100 font-bold py-1 px-3 rounded-lg shadow mb-4 mt-3 md:mr-[30px]">
-                Total Storage: {totalStorage} GB
+              <div className="flex items-center justify-center w-full md:w-auto px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Storage:</span>
+                <span className="text-emerald-800">{totalStorage} GB</span>
               </div>
             </div>
-            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto">
-              <div
-                className={`w-full lg:w-[550px] border-greenish bg-yellowish bg-opacity-40 border-2 font-bold py-1 px-3 rounded-lg mt-3 mb-2 shadow md:mr-[30px] 2xl:ml-[100px] 2xl:mr-[100px]`}
-              >
-                Total Cluster Cost: $
-                {totalClusterCost.toLocaleString("en-US", {
-                  maximumFractionDigits: 0,
-                })}
+            <div className="flex flex-wrap justify-center items-center flex-grow xs:w-auto mt-2 mb-2">
+              <div className="flex items-center justify-center w-full lg:w-auto px-6 py-2.5 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold">
+                <span className="text-emerald-600 mr-2">Total Cluster Cost:</span>
+                <span className="text-emerald-800 text-lg">${totalClusterCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
           </div>

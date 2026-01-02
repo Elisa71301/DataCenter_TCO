@@ -373,9 +373,9 @@ const Network: React.FC<NetworkProps> = ({
           <option value="infiniband">Nvidia Mellanox Infiniband</option>
           <option value="slingshot">HPE Cray Slingshot</option>
         </select>
-        <div className="w-full md:w-[450px] border-orange-500 bg-orange-100 border-2 font-bold py-1 px-3 rounded-lg shadow mb-2 md:mr-[50px] mt-2 mdd:mt-[-5px]">
-          Network Cost: $
-          {totalNetCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+        <div className="flex items-center justify-center w-full md:w-auto px-5 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold mb-2 md:mr-4 mt-2">
+          <span className="text-emerald-600 mr-2">Network Cost:</span>
+          <span className="text-emerald-800">${totalNetCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
 
@@ -460,13 +460,13 @@ const Network: React.FC<NetworkProps> = ({
                   max={99}
                   sx={{
                     "& .MuiSlider-thumb": {
-                      color: "#38b2ac", // Tailwind teal 500 color
+                      color: "#10b981", // Tailwind emerald-500
                     },
                     "& .MuiSlider-track": {
-                      color: "#38b2ac", // Tailwind teal 500 color
+                      color: "#10b981", // Tailwind emerald-500
                     },
                     "& .MuiSlider-rail": {
-                      color: "lightgray", // Light gray track color
+                      color: "#d1fae5", // Tailwind emerald-100
                     },
                     height: 7,
                   }}

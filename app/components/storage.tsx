@@ -178,9 +178,9 @@ const Storage: React.FC<StorageProps> = ({
           </span>
         )}
       </div>
-      <div className="sm:w-[400px] w-full border-cyan-500 bg-cyan-100 border-2 font-bold py-1 px-3 rounded-lg mt-4 shadow ml-4 mr-4 sm:mr-[50px]">
-        Storage Cost: $
-        {storageCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+      <div className="flex items-center justify-center w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-xl shadow-sm font-semibold mt-4 ml-4 mr-4">
+        <span className="text-emerald-600 mr-2">Storage Cost:</span>
+        <span className="text-emerald-800">${storageCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
       </div>
     </div>
   );

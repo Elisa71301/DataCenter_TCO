@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { TypeAnimation } from "react-type-animation";
 import Land from "./components/land";
 import Server from "./components/server";
@@ -18,10 +18,34 @@ import {
   faChevronDown,
   faCheck,
   faUpload,
+  faFlask,
+  faBuilding,
+  faServer,
+  faBolt,
+  faFileContract,
+  faGlobe,
+  faInfoCircle,
 } from "@fortawesome/free-solid-svg-icons";
 import JsonUploader from "./components/jsonUploader";
 import { useTCO } from "./context/useContext";
+import { useScenario } from "./context/scenarioContext";
 import Link from "next/link";
+
+// Scenario components
+import ScenarioSelector from "./components/scenarioSelector";
+import ScenarioParameters from "./components/scenarioParameters";
+import AssumptionPanel from "./components/assumptionPanel";
+import CostBreakdown from "./components/costBreakdown";
+import SecurityControls from "./components/securityControls";
+import RiskModel from "./components/riskModel";
+import ScenarioComparison from "./components/scenarioComparison";
+import SensitivityAnalysis from "./components/sensitivityAnalysis";
+import HelpSystem from "./components/documentation/helpSystem";
+import { computeScenarioTCO, BaseTCOInput } from "./services/computationEngine";
+import { ComputationBreakdown, Region, WorkloadClass, RegulatoryIntensity } from "./context/types";
+import { getRegionImpactSummary } from "./constants/regionMultipliers";
+import { WORKLOAD_PARAMETERS } from "./constants/workloadParameters";
+import { REGULATORY_PARAMETERS } from "./constants/regulatoryParameters";
 
 interface serverClusterProps {
   index: string;
@@ -53,6 +77,52 @@ interface storageClusterProps {
   price?: number;
 }
 
+// Section Header Component
+const SectionHeader = ({
+  icon,
+  iconColor,
+  title,
+  description,
+  isOpen,
+  onToggle,
+  totalCost,
+}: {
+  icon: any;
+  iconColor: string;
+  title: string;
+  description: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  totalCost?: number;
+}) => (
+  <div
+    className="flex flex-row items-center justify-between cursor-pointer p-4 hover:bg-gray-50 transition-colors rounded-t-2xl"
+    onClick={onToggle}
+  >
+    <div className="flex flex-row items-center">
+      <FontAwesomeIcon icon={icon} className={`${iconColor} text-xl mr-3`} />
+      <div className="font-bold text-lg">{title}</div>
+      <div className="flex hoverable-button justify-center items-center w-[16px] h-[16px] ml-3 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
+        i
+      </div>
+      <span className="z-10 display-on-hover absolute w-[90%] md:w-[75%] top-[50px] left-[0px] md:top-[50px] md:left-[50px] right-0 mx-auto p-3 text-white bg-gray-500 text-xs sm:text-sm rounded-lg shadow">
+        {description}
+      </span>
+    </div>
+    <div className="flex items-center gap-4">
+      {totalCost !== undefined && (
+        <div className="text-sm font-semibold text-gray-600">
+          ${totalCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+        </div>
+      )}
+      <FontAwesomeIcon
+        icon={isOpen ? faChevronUp : faChevronDown}
+        className="text-gray-500"
+      />
+    </div>
+  </div>
+);
+
 export default function Home() {
   const [serverClusters, setServerClusters] = useState<serverClusterProps[]>(
     []
@@ -80,6 +150,12 @@ export default function Home() {
   const [laborCost, setLaborCost] = useState(0);
   const [laborChoice, setLaborChoice] = useState(false);
 
+  // Section collapse states
+  const [section1Open, setSection1Open] = useState(true);
+  const [section2Open, setSection2Open] = useState(true);
+  const [section3Open, setSection3Open] = useState(true);
+  const [section4Open, setSection4Open] = useState(true);
+
   const {
     setServerClusterJson,
     storageNode,
@@ -88,6 +164,26 @@ export default function Home() {
   } = useTCO();
 
   const [pue, setPueValue] = useState(1.35);
+  
+  // Scenario state
+  const [showScenarioPanel, setShowScenarioPanel] = useState(true);
+  const [activeTab, setActiveTab] = useState<"config" | "analysis">("config");
+  const {
+    activeScenario,
+    setComputationResult,
+    computationResults,
+    setRegion,
+    setWorkloadClass,
+    setAIEnabled,
+    setRegulatoryIntensity,
+    setSecurityInvestment,
+    updateScenario,
+  } = useScenario();
+  const [currentBreakdown, setCurrentBreakdown] = useState<ComputationBreakdown | null>(null);
+
+  const regions: Region[] = ["US", "EU", "Global"];
+  const workloadClasses: WorkloadClass[] = ["Low", "Medium", "High"];
+  const regulatoryLevels: RegulatoryIntensity[] = ["Low", "Medium", "High"];
 
   const addServerCluster = () => {
     setServerClusters([
@@ -315,18 +411,6 @@ export default function Home() {
     softwareLicenseCost,
   ]);
 
-  // const addStorageCluster = () => {
-  //   setStorageClusters([
-  //     ...storageCluster,
-  //     {
-  //       id: uuidv4(),
-  //       storage: 10,
-  //       totalCost: 0,
-  //       consumption: 0,
-  //     },
-  //   ]);
-  // };
-
   useEffect(() => {
     if (serverClusterJson && Array.isArray(serverClusterJson)) {
       const newClusters = serverClusterJson.map((node) => ({
@@ -365,8 +449,57 @@ export default function Home() {
     }
   }, [storageNode]);
 
+  // Compute scenario TCO when relevant values change
+  useEffect(() => {
+    if (!activeScenario) return;
+
+    const baseTCO: BaseTCOInput = {
+      land: propertyValue,
+      servers: totalServerCost,
+      storage: totalStorageCost,
+      network: totalNetCost,
+      powerDistribution: totalPCost,
+      energy: costOfPower,
+      software: softwareLicenseCost,
+      labor: laborChoice ? laborCost : 0,
+    };
+
+    const context = {
+      nodeCount: totalNodeCount,
+      totalStorageTB: totalStorage,
+    };
+
+    try {
+      const breakdown = computeScenarioTCO(baseTCO, activeScenario, context);
+      setCurrentBreakdown(breakdown);
+      setComputationResult(activeScenario.id, breakdown);
+    } catch (error) {
+      console.error("Error computing scenario TCO:", error);
+    }
+  }, [
+    activeScenario,
+    propertyValue,
+    totalServerCost,
+    totalStorageCost,
+    totalNetCost,
+    totalPCost,
+    costOfPower,
+    softwareLicenseCost,
+    laborCost,
+    laborChoice,
+    totalNodeCount,
+    totalStorage,
+    setComputationResult,
+  ]);
+
+  // Calculate section totals
+  const section1Total = propertyValue;
+  const section2Total = totalServerCost + totalStorageCost + totalNetCost;
+  const section3Total = totalPCost + costOfPower;
+  const section4Total = softwareLicenseCost + (laborChoice ? laborCost : 0);
+
   return (
-    <main className="flex flex-col text-center justify-center space-y-12 text-sm items-center bg-gray-100 h-full pb-12 relative">
+    <main className="flex flex-col text-center justify-center space-y-8 text-sm items-center bg-gray-100 h-full pb-12 relative">
       <div
         title="Upload Json Configuration"
         className="fixed z-10 bottom-2 right-1 md:bottom-4 md:right-3 lg:bottom-6 lg:right-6"
@@ -433,299 +566,632 @@ export default function Home() {
           )}
         </AnimatePresence>
       </div>
-      <div className="w-7/8 bg-white text-left pb-10 rounded-2xl relative">
-        <div className="flex flex-row">
-          <div className="flex flex-row items-center">
-            <div className="p-4 font-bold w-full text-left">
-              LAND & BUILDING
-            </div>
 
-            <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] mr-[5px] xs:ml-[-6px] rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-              i
-            </div>
-            <span className="z-10 display-on-hover absolute w-[90%] md:w-[75%] top-[50px] left-[0px] md:top-[06px] md:left-[160px] lg:left-[120px] xl:left-[75px] right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow">
-              <span className="font-bold">Land and Building </span>cost refers
-              to the expenses associated with acquiring the land and
-              constructing the infrastructure necessary to house all the
-              required equipment. This does not include the cost of the
-              equipment itself.
-              <br></br>
-              <br></br>
-              The customizable option is still under development.
+      {/* Scenario Panel - Research Artifact Extension */}
+      <div className="w-full max-w-6xl px-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <FontAwesomeIcon icon={faFlask} className="text-purple-500 text-xl" />
+            <h2 className="text-xl font-bold text-gray-800">Scenario Analysis</h2>
+            <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
+              Research Mode
             </span>
           </div>
-        </div>
-        <Land
-          homePropertyValue={propertyValue}
-          setPropertyValue={setPropertyValue}
-        />
-      </div>
-      {serverClusters.map((cluster) => (
-        <div
-          className="w-7/8 bg-white pb-10 rounded-2xl mb-4 relative"
-          key={cluster.index}
-        >
-          <div className="p-4 font-bold w-full lg:text-left">SERVER</div>
-          <div className="flex justify-between items-center p-4">
-            <Server
-              index={cluster.index}
-              homeNodeCountProp={cluster.homeNodeCountProp}
-              modeProp={cluster.modeProp}
-              cpuProp={cluster.cpuProp}
-              processorsPerNodeProp={cluster.processorsPerNodeProp}
-              coresPerProcessorProp={cluster.coresPerProcessorProp}
-              ramPerNodeProp={cluster.ramPerNodeProp}
-              storagePerNodeProp={cluster.storagePerNodeProp}
-              typeOfSSDProp={cluster.typeOfSSDProp}
-              gpuProp={cluster.gpuProp}
-              gpu_perNodeProp={cluster.gpu_perNodeProp || 0}
-              gpu_modelProp={cluster.gpu_modelProp || "H100"}
-              custom_core_per_nodeProp={cluster.custom_core_per_nodeProp || 1}
-              custom_cost_per_nodeProp={cluster.custom_cost_per_nodeProp || 1}
-              updateServerCluster={updateServerCluster}
-              updateServerNodeCluster={updateServerNodeCluster}
-              updateServerNodeConsumption={updateServerNodeConsumption}
-              updateServerCoreNumber={updateServerCoreNumber}
-              updateServerGpuNumber={updateServerGpuNumber}
-            />
-            <button
-              onClick={() => removeServerCluster(cluster.index)}
-              className="ml-2 p-1 bg-red-500 text-white rounded hover:bg-red-700 absolute right-4 bottom-4"
-            >
-              Remove Server Node
-            </button>
-          </div>
-        </div>
-      ))}
-      {storageCluster.map((cluster) => (
-        <div
-          className="w-7/8 bg-white pb-10 rounded-2xl mb-4 relative"
-          key={cluster.id}
-        >
-          <div className="p-4 font-bold w-full lg:text-left">STORAGE</div>
-          <div className="flex justify-between items-center p-4">
-            <Storage
-              index={cluster.id}
-              storage={cluster.storage || 10}
-              modeProp={cluster.mode || "guided"}
-              priceProp={cluster.price || 0}
-              typeProp={cluster.type || "hdd"}
-              updateStorageClusterCost={updateStorageClusterCost}
-              updateStorageAmount={updateStorageAmount}
-              updateStorageNodeConsumption={updateStorageNodeConsumption}
-            />
-            <button
-              onClick={() => removeStorageCluster(cluster.id)}
-              className="ml-2 p-1 bg-red-500 text-white rounded hover:bg-red-700 absolute right-4 bottom-4"
-            >
-              Remove Storage Node
-            </button>
-          </div>
-        </div>
-      ))}
-      <div className="flex justify-between items-center mt-4">
-        <button
-          onClick={addServerCluster}
-          className="p-2 bg-blue-500 text-white rounded hover:bg-blue-700 mr-5"
-        >
-          Add Server Node
-        </button>
-        <button
-          onClick={addStorageCluster}
-          className="p-2 bg-emerald-500 text-white rounded hover:bg-emerald-700"
-        >
-          Add Storage Node
-        </button>
-      </div>
-      <div className="w-7/8 bg-white pb-10 rounded-2xl relative">
-        <div className="flex flex-row">
-          <div className="flex flex-row items-center">
-            <div className="p-4 font-bold w-full text-left">NETWORKING</div>
-            <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-[-6px] rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-              i
-            </div>
-            <span
-              className="display-on-hover absolute top-[-90px] xs:top-[-95px] sm:top-[-105px] md:top-[-63px] lg:top-[-63px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-              style={{
-                width: "calc(100% - 40px)", // Full width minus 20px margin on each side
-                maxWidth: "1200px", // Maximum width to match the original design
-              }}
-            >
-              <span className="font-bold">Networking Costs</span> cover the cost
-              for all the components of both internal and external network
-              connections of the Data center. So it includes Clusters
-              Interconnects, cabling, NICs, switches, routers, load balancers,
-              firewalls and others.
-            </span>
-          </div>
+          <button
+            onClick={() => setShowScenarioPanel(!showScenarioPanel)}
+            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            {showScenarioPanel ? "Hide" : "Show"} Scenario Panel
+          </button>
         </div>
 
-        <Network
-          homeBandwidth={bandwidth}
-          setBandwidth={setBandwidth}
-          nodes={totalNodeCount}
-          tier={tier}
-          setTier={setTier}
-          totalNetCost={totalNetCost}
-          totalGpuNum={totalGPUCount}
-          setTotalNetCost={setTotalNetCost}
-          totalNetworkConsumption={totalNetworkConsumption}
-          setTotalNetworkConsumption={setTotalNetworkConsumption}
-        />
+        <AnimatePresence>
+          {showScenarioPanel && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              {/* Tab navigation */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setActiveTab("config")}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeTab === "config"
+                      ? "bg-purple-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Configuration
+                </button>
+                <button
+                  onClick={() => setActiveTab("analysis")}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeTab === "analysis"
+                      ? "bg-purple-500 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Analysis & Comparison
+                </button>
+              </div>
+
+              {/* Config Tab */}
+              {activeTab === "config" && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <ScenarioSelector />
+                  <ScenarioParameters className="lg:col-span-2" />
+                </div>
+              )}
+
+              {/* Analysis Tab */}
+              {activeTab === "analysis" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <CostBreakdown breakdown={currentBreakdown} />
+                    <RiskModel
+                      totalSecurityInvestment={
+                        currentBreakdown?.securityCosts.total || 0
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <SensitivityAnalysis
+                      baseBreakdown={currentBreakdown}
+                      baseTCOInput={{
+                        energy: costOfPower,
+                        labor: laborChoice ? laborCost : 0,
+                      }}
+                    />
+                    <ScenarioComparison breakdowns={computationResults} />
+                  </div>
+                </div>
+              )}
+
+              {/* Assumption Panel - Always visible in scenario mode */}
+              <div className="mt-4">
+                <AssumptionPanel />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="w-7/8 bg-white pb-10 rounded-2xl relative">
-        <div className="flex flex-row">
-          <div className="flex flex-row items-center">
-            <div className="p-4 font-bold w-full text-left">
-              POWER DISTRIBUTION AND COOLING INFRASTRUCTURE
-            </div>
-            <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] mr-[5px] xs:ml-[-6px] rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-              i
-            </div>
-            <span
-              className="z-10 display-on-hover absolute top-[-155px] xs:top-[-120px] sm:top-[-133px] md:top-[-105px] lg:top-[-83px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-              style={{
-                width: "calc(100% - 40px)", // Full width minus 20px margin on each side
-                maxWidth: "1200px", // Maximum width to match the original design
-              }}
-            >
-              <span className="font-bold">Power Distribution Cost</span>{" "}
-              represents the cost of procuring all the components necessary to
-              supply the facility with power. This includes transformers, PDUs,
-              power cords, connectors, power breakers, UPS systems, backup
-              generators, ATS units, and more.
-              <span className="font-bold"> Cooling Infrastructure</span> covers
-              the cost of acquiring the components needed to cool down the
-              facility, such as CRAC/CRAH systems, liquid cooling components.
-              etc.
-            </span>
-          </div>
-        </div>
-        <PowerDistribution
-          tier={tier}
-          homePue={pue}
-          totalConsumption={totalNetworkConsumption + totalServerConsumption}
-          pdCost={totalPCost}
-          setPDcost={setTotalPCost}
-          setPueValue={setPueValue}
+      {/* ========== SECTION 1: LAND & BUILDING ========== */}
+      <div className="w-7/8 bg-white text-left rounded-2xl relative shadow-md">
+        <SectionHeader
+          icon={faBuilding}
+          iconColor="text-amber-600"
+          title="LAND & BUILDING"
+          description="Land and Building cost refers to the expenses associated with acquiring the land and constructing the infrastructure necessary to house all the required equipment. This section also includes Region selection which affects energy costs, labor costs, and compliance costs."
+          isOpen={section1Open}
+          onToggle={() => setSection1Open(!section1Open)}
+          totalCost={section1Total}
         />
+        <AnimatePresence>
+          {section1Open && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
+            >
+              {/* Region Selection - moved from ScenarioParameters */}
+              {activeScenario && (
+                <div className="px-4 pb-4 border-b border-gray-100">
+                  <div className="bg-amber-50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
+                      <FontAwesomeIcon icon={faGlobe} className="text-amber-600" />
+                      <span>Region</span>
+                      <div className="group relative">
+                        <FontAwesomeIcon
+                          icon={faInfoCircle}
+                          className="text-gray-400 text-sm cursor-help"
+                        />
+                        <div className="hidden group-hover:block absolute z-10 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg left-0 top-6">
+                          <p className="font-medium mb-1">Region affects:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li>Energy costs (electricity prices)</li>
+                            <li>Labor costs (wages)</li>
+                            <li>Compliance costs (regulatory overhead)</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {regions.map((region) => (
+                        <button
+                          key={region}
+                          onClick={() => setRegion(region)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            activeScenario.region === region
+                              ? "bg-amber-500 text-white shadow-md"
+                              : "bg-white text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {region}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {getRegionImpactSummary(activeScenario.region)}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <Land
+                homePropertyValue={propertyValue}
+                setPropertyValue={setPropertyValue}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="w-7/8 bg-white pb-10 rounded-2xl relative">
-        <div className="flex flex-row">
-          <div className="flex flex-row items-center">
-            <div className="p-4 font-bold w-full text-left">ENERGY COST</div>
-            <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] mr-[5px] xs:ml-[-6px] rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-              i
-            </div>
-            <span
-              className="z-10 display-on-hover absolute top-[-130px] xs:top-[-110px] sm:top-[-117px] md:top-[-100px] lg:top-[-63px] xl:top-[-65px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-              style={{
-                width: "calc(100% - 40px)", // Full width minus 20px margin on each side
-                maxWidth: "1200px", // Maximum width to match the original design
-              }}
-            >
-              <span className="font-bold">Energy Cost</span> encompasses the
-              energy expenses incurred by the data center to operate not only
-              the computing servers but also the entire supporting
-              infrastructure. This includes networking equipment, cooling
-              systems, backup power solutions, security systems, and office
-              spaces.
-            </span>
-          </div>
-        </div>
-        <PowerCost
-          tier={tier}
-          pue={pue}
-          netConsumption={totalNetworkConsumption}
-          serverConsumption={totalServerConsumption}
-          nodeCount={totalNodeCount}
-          costOfPower={costOfPower}
-          setCostOfPower={setCostOfPower}
+      {/* ========== SECTION 2: SERVER, STORAGE & NETWORK ========== */}
+      <div className="w-7/8 bg-white text-left rounded-2xl relative shadow-md">
+        <SectionHeader
+          icon={faServer}
+          iconColor="text-emerald-600"
+          title="SERVER, STORAGE & NETWORK"
+          description="This section covers all computing infrastructure costs including servers, storage systems, and networking equipment. It also includes Workload settings which affect energy consumption, cooling overhead, and monitoring requirements."
+          isOpen={section2Open}
+          onToggle={() => setSection2Open(!section2Open)}
+          totalCost={section2Total}
         />
-      </div>
-      <div className="w-7/8 bg-white pb-10 rounded-2xl relative">
-        <div className="flex flex-row">
-          <div className="flex flex-row items-center">
-            <div className="p-4 font-bold w-full text-left">
-              SOFTWARE LICENSE
-            </div>
-            <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] mr-[5px] xs:ml-[-6px] rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-              i
-            </div>
-            <span
-              className="z-10 display-on-hover absolute top-[-130px] xs:top-[-110px] sm:top-[-117px] md:top-[-100px] lg:top-[-63px] xl:top-[-70px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-              style={{
-                width: "calc(100% - 40px)", // Full width minus 20px margin on each side
-                maxWidth: "1200px", // Maximum width to match the original design
-              }}
+        <AnimatePresence>
+          {section2Open && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
             >
-              <span className="font-bold">Software License Cost</span> refer to
-              the one-time expenditure incurred from purchasing the rights to
-              use various software solutions within the data center environment.
-              These solutions encompass operating systems, server management
-              tools, security software, and applications essential to make the
-              whole data center infrastructure operational.
-            </span>
-          </div>
-        </div>
-        <SoftwareLicense
-          nodeCount={totalNodeCount}
-          cores={coresNumber}
-          softwareCost={softwareLicenseCost}
-          setSoftwareCost={setSoftwareLicenseCost}
-        />
+              {/* Workload Selection - moved from ScenarioParameters */}
+              {activeScenario && (
+                <div className="px-4 pb-4 border-b border-gray-100">
+                  <div className="bg-emerald-50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
+                      <FontAwesomeIcon icon={faServer} className="text-emerald-600" />
+                      <span>Workload Class</span>
+                      <div className="group relative">
+                        <FontAwesomeIcon
+                          icon={faInfoCircle}
+                          className="text-gray-400 text-sm cursor-help"
+                        />
+                        <div className="hidden group-hover:block absolute z-10 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg left-0 top-6">
+                          <p className="font-medium mb-1">Workload affects:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li>Energy consumption</li>
+                            <li>Cooling overhead</li>
+                            <li>Monitoring volume</li>
+                          </ul>
+                          <p className="mt-2 text-emerald-300">
+                            Coarse utilization scenario, not app simulation.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {workloadClasses.map((wc) => (
+                        <button
+                          key={wc}
+                          onClick={() => setWorkloadClass(wc)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            activeScenario.workload.utilizationClass === wc
+                              ? "bg-emerald-500 text-white shadow-md"
+                              : "bg-white text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          {wc}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {WORKLOAD_PARAMETERS[activeScenario.workload.utilizationClass].description}
+                    </p>
+
+                    {/* AI mode toggle */}
+                    <div className="flex items-center justify-between p-3 bg-emerald-100 rounded-lg">
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">
+                          AI-Accelerated Workloads
+                        </span>
+                        <p className="text-xs text-gray-500">
+                          Higher energy and cooling multipliers
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={activeScenario.workload.aiEnabled}
+                          onChange={(e) => setAIEnabled(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Server Clusters */}
+              {serverClusters.map((cluster) => (
+                <div
+                  className="border-b border-gray-100 pb-6 mb-4 relative"
+                  key={cluster.index}
+                >
+                  <div className="p-4 font-bold w-full lg:text-left text-gray-700">
+                    SERVER CLUSTER
+                  </div>
+                  <div className="flex justify-between items-center px-4">
+                    <Server
+                      index={cluster.index}
+                      homeNodeCountProp={cluster.homeNodeCountProp}
+                      modeProp={cluster.modeProp}
+                      cpuProp={cluster.cpuProp}
+                      processorsPerNodeProp={cluster.processorsPerNodeProp}
+                      coresPerProcessorProp={cluster.coresPerProcessorProp}
+                      ramPerNodeProp={cluster.ramPerNodeProp}
+                      storagePerNodeProp={cluster.storagePerNodeProp}
+                      typeOfSSDProp={cluster.typeOfSSDProp}
+                      gpuProp={cluster.gpuProp}
+                      gpu_perNodeProp={cluster.gpu_perNodeProp || 0}
+                      gpu_modelProp={cluster.gpu_modelProp || "H100"}
+                      custom_core_per_nodeProp={cluster.custom_core_per_nodeProp || 1}
+                      custom_cost_per_nodeProp={cluster.custom_cost_per_nodeProp || 1}
+                      updateServerCluster={updateServerCluster}
+                      updateServerNodeCluster={updateServerNodeCluster}
+                      updateServerNodeConsumption={updateServerNodeConsumption}
+                      updateServerCoreNumber={updateServerCoreNumber}
+                      updateServerGpuNumber={updateServerGpuNumber}
+                    />
+                    <button
+                      onClick={() => removeServerCluster(cluster.index)}
+                      className="ml-2 p-2 bg-red-500 text-white rounded hover:bg-red-700 absolute right-4 bottom-2 text-xs"
+                    >
+                      Remove Server
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Storage Clusters */}
+              {storageCluster.map((cluster) => (
+                <div
+                  className="border-b border-gray-100 pb-6 mb-4 relative"
+                  key={cluster.id}
+                >
+                  <div className="p-4 font-bold w-full lg:text-left text-gray-700">
+                    STORAGE
+                  </div>
+                  <div className="flex justify-between items-center px-4">
+                    <Storage
+                      index={cluster.id}
+                      storage={cluster.storage || 10}
+                      modeProp={cluster.mode || "guided"}
+                      priceProp={cluster.price || 0}
+                      typeProp={cluster.type || "hdd"}
+                      updateStorageClusterCost={updateStorageClusterCost}
+                      updateStorageAmount={updateStorageAmount}
+                      updateStorageNodeConsumption={updateStorageNodeConsumption}
+                    />
+                    <button
+                      onClick={() => removeStorageCluster(cluster.id)}
+                      className="ml-2 p-2 bg-red-500 text-white rounded hover:bg-red-700 absolute right-4 bottom-2 text-xs"
+                    >
+                      Remove Storage
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Add buttons */}
+              <div className="flex justify-center items-center gap-4 py-4">
+                <button
+                  onClick={addServerCluster}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm font-medium"
+                >
+                  + Add Server Cluster
+                </button>
+                <button
+                  onClick={addStorageCluster}
+                  className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 text-sm font-medium"
+                >
+                  + Add Storage
+                </button>
+              </div>
+
+              {/* Network */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="p-4 font-bold w-full text-left text-gray-700 flex items-center">
+                  NETWORKING
+                  <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-2 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
+                    i
+                  </div>
+                  <span className="z-10 display-on-hover absolute w-[90%] top-auto left-[5%] p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow">
+                    <span className="font-bold">Networking Costs</span> cover the cost
+                    for all the components of both internal and external network
+                    connections of the Data center. So it includes Clusters
+                    Interconnects, cabling, NICs, switches, routers, load balancers,
+                    firewalls and others.
+                  </span>
+                </div>
+                <Network
+                  homeBandwidth={bandwidth}
+                  setBandwidth={setBandwidth}
+                  nodes={totalNodeCount}
+                  tier={tier}
+                  setTier={setTier}
+                  totalNetCost={totalNetCost}
+                  totalGpuNum={totalGPUCount}
+                  setTotalNetCost={setTotalNetCost}
+                  totalNetworkConsumption={totalNetworkConsumption}
+                  setTotalNetworkConsumption={setTotalNetworkConsumption}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      <div className="w-7/8 bg-white pb-10 rounded-2xl relative">
-        <div className="flex flex-row">
-          <div className="flex flex-row items-center">
-            <div className="p-4 font-bold w-full text-left">WORKFORCE</div>
-            <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] mr-[5px] xs:ml-[-6px] rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
-              i
-            </div>
-            <span
-              className="z-10 display-on-hover absolute top-[-106px] xxxs:top-[-88px] xxs:top-[-70px] xs:top-[-60px] sm:top-[-65px] md:top-[-62px] lg:top-[-63px] xl:top-[-45px] left-0 right-0 mx-auto p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow"
-              style={{
-                width: "calc(100% - 40px)", // Full width minus 20px margin on each side
-                maxWidth: "1200px", // Maximum width to match the original design
-              }}
+
+      {/* ========== SECTION 3: POWER / ENERGY ========== */}
+      <div className="w-7/8 bg-white text-left rounded-2xl relative shadow-md">
+        <SectionHeader
+          icon={faBolt}
+          iconColor="text-yellow-500"
+          title="POWER / ENERGY"
+          description="This section covers power distribution infrastructure (transformers, PDUs, UPS, backup generators) and cooling systems, as well as ongoing energy costs for operating the facility."
+          isOpen={section3Open}
+          onToggle={() => setSection3Open(!section3Open)}
+          totalCost={section3Total}
+        />
+        <AnimatePresence>
+          {section3Open && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
             >
-              <span className="font-bold">Workforce Cost</span> represents the
-              total annual cost of the data center employees, which includes not
-              only base salary but also taxes, benefits and bonuses.
-            </span>
-          </div>
-        </div>
-        <Labor
-          nodeCount={totalNodeCount}
-          laborCost={costOfPower}
-          laborChoice={laborChoice}
-          setLaborCost={setLaborCost}
-          setLaborChoice={setLaborChoice}
-          tcoCost={
-            propertyValue +
-            totalServerCost +
-            totalNetCost +
-            totalStorageCost +
-            totalPCost
-          }
+              {/* Power Distribution */}
+              <div className="border-b border-gray-100">
+                <div className="p-4 font-bold w-full text-left text-gray-700 flex items-center">
+                  POWER DISTRIBUTION & COOLING INFRASTRUCTURE
+                  <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-2 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
+                    i
+                  </div>
+                  <span className="z-10 display-on-hover absolute w-[90%] top-auto left-[5%] p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow">
+                    <span className="font-bold">Power Distribution Cost</span> represents
+                    the cost of procuring all the components necessary to supply the
+                    facility with power. This includes transformers, PDUs, power cords,
+                    connectors, power breakers, UPS systems, backup generators, ATS
+                    units, and more. <span className="font-bold">Cooling Infrastructure</span> covers
+                    the cost of acquiring the components needed to cool down the
+                    facility.
+                  </span>
+                </div>
+                <PowerDistribution
+                  tier={tier}
+                  homePue={pue}
+                  totalConsumption={totalNetworkConsumption + totalServerConsumption}
+                  pdCost={totalPCost}
+                  setPDcost={setTotalPCost}
+                  setPueValue={setPueValue}
+                />
+              </div>
+
+              {/* Energy Cost */}
+              <div>
+                <div className="p-4 font-bold w-full text-left text-gray-700 flex items-center">
+                  ENERGY COST
+                  <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-2 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
+                    i
+                  </div>
+                  <span className="z-10 display-on-hover absolute w-[90%] top-auto left-[5%] p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow">
+                    <span className="font-bold">Energy Cost</span> encompasses the
+                    energy expenses incurred by the data center to operate not only the
+                    computing servers but also the entire supporting infrastructure
+                    including networking equipment, cooling systems, and backup power.
+                  </span>
+                </div>
+                <PowerCost
+                  tier={tier}
+                  pue={pue}
+                  netConsumption={totalNetworkConsumption}
+                  serverConsumption={totalServerConsumption}
+                  nodeCount={totalNodeCount}
+                  costOfPower={costOfPower}
+                  setCostOfPower={setCostOfPower}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ========== SECTION 4: LICENSE & WELFARE ========== */}
+      <div className="w-7/8 bg-white text-left rounded-2xl relative shadow-md">
+        <SectionHeader
+          icon={faFileContract}
+          iconColor="text-indigo-600"
+          title="LICENSE & WELFARE"
+          description="This section covers software licensing costs, workforce/labor expenses, regulatory compliance requirements, and security investments. Regulatory intensity affects audit frequency, documentation overhead, and compliance costs."
+          isOpen={section4Open}
+          onToggle={() => setSection4Open(!section4Open)}
+          totalCost={section4Total}
         />
+        <AnimatePresence>
+          {section4Open && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
+            >
+              {/* Regulatory & Security - moved from ScenarioParameters */}
+              {activeScenario && (
+                <div className="px-4 pb-4 border-b border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Regulatory Section */}
+                    <div className="bg-indigo-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
+                        <span className="text-lg">⚖️</span>
+                        <span>Regulatory Intensity</span>
+                        <div className="group relative">
+                          <FontAwesomeIcon
+                            icon={faInfoCircle}
+                            className="text-gray-400 text-sm cursor-help"
+                          />
+                          <div className="hidden group-hover:block absolute z-10 w-64 p-3 bg-gray-800 text-white text-xs rounded-lg shadow-lg left-0 top-6">
+                            <p className="font-medium mb-1">Regulatory intensity affects:</p>
+                            <ul className="list-disc list-inside space-y-1">
+                              <li>Audit frequency</li>
+                              <li>Documentation overhead</li>
+                              <li>Compliance costs</li>
+                            </ul>
+                            <p className="mt-2 text-indigo-300">
+                              Cost model only - does not verify compliance.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {regulatoryLevels.map((level) => (
+                          <button
+                            key={level}
+                            onClick={() => setRegulatoryIntensity(level)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                              activeScenario.regulatoryIntensity === level
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "bg-white text-gray-700 hover:bg-gray-100"
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        {REGULATORY_PARAMETERS[activeScenario.regulatoryIntensity].description}
+                      </p>
+                    </div>
+
+                    {/* Security Investment */}
+                    <div className="bg-indigo-50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
+                        <span className="text-lg">🔐</span>
+                        <span>Security Investment</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-indigo-600">Annual Investment</span>
+                          <span className="font-mono font-medium text-indigo-800">
+                            ${activeScenario.security.annualInvestment.toLocaleString()}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={500000}
+                          step={10000}
+                          value={activeScenario.security.annualInvestment}
+                          onChange={(e) => setSecurityInvestment(parseInt(e.target.value))}
+                          className="w-full h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                        />
+                        <div className="flex justify-between text-xs text-indigo-400">
+                          <span>$0</span>
+                          <span>$500K</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Security Controls Panel */}
+                  <div className="mt-4">
+                    <SecurityControls
+                      nodeCount={totalNodeCount}
+                      totalStorageTB={totalStorage}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Software License */}
+              <div className="border-b border-gray-100">
+                <div className="p-4 font-bold w-full text-left text-gray-700 flex items-center">
+                  SOFTWARE LICENSE
+                  <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-2 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
+                    i
+                  </div>
+                  <span className="z-10 display-on-hover absolute w-[90%] top-auto left-[5%] p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow">
+                    <span className="font-bold">Software License Cost</span> refer to
+                    the one-time expenditure incurred from purchasing the rights to use
+                    various software solutions within the data center environment,
+                    including operating systems, server management tools, and security
+                    software.
+                  </span>
+                </div>
+                <SoftwareLicense
+                  nodeCount={totalNodeCount}
+                  cores={coresNumber}
+                  softwareCost={softwareLicenseCost}
+                  setSoftwareCost={setSoftwareLicenseCost}
+                />
+              </div>
+
+              {/* Workforce */}
+              <div>
+                <div className="p-4 font-bold w-full text-left text-gray-700 flex items-center">
+                  WORKFORCE
+                  <div className="flex hoverable-button justify-center items-center w-[13px] h-[13px] ml-2 rounded-full bg-gray-200 text-xs leading-none cursor-pointer">
+                    i
+                  </div>
+                  <span className="z-10 display-on-hover absolute w-[90%] top-auto left-[5%] p-2 text-white bg-gray-400 text-xs sm:text-sm rounded-lg shadow">
+                    <span className="font-bold">Workforce Cost</span> represents the
+                    total annual cost of the data center employees, which includes not
+                    only base salary but also taxes, benefits and bonuses.
+                  </span>
+                </div>
+                <Labor
+                  nodeCount={totalNodeCount}
+                  laborCost={costOfPower}
+                  laborChoice={laborChoice}
+                  setLaborCost={setLaborCost}
+                  setLaborChoice={setLaborChoice}
+                  tcoCost={
+                    propertyValue +
+                    totalServerCost +
+                    totalNetCost +
+                    totalStorageCost +
+                    totalPCost
+                  }
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      <div className="flex flex-wrap w-7/8 bg-white p-2 rounded-2xl items-center lg:text-lg justify-center px-4 ">
-        <div className="flex items-center justify-center w-[500px] mt-2 h-[50px] sm:h-[70px] border-emerald-500 bg-emerald-100 border-2 font-bold py-1 px-3 rounded-lg shadow lg:mr-4 ">
-          <div className="font-bold mr-1">TOTAL COST = $</div>
-          {totalCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+
+      {/* Total Cost Summary */}
+      <div className="flex flex-wrap w-7/8 bg-white p-6 rounded-2xl items-center justify-center gap-4 shadow-md">
+        <div className="flex items-center justify-center px-8 py-4 bg-gradient-to-r from-slate-700 to-slate-800 border-2 border-slate-600 rounded-2xl shadow-lg">
+          <span className="text-slate-300 font-bold text-lg mr-3">TOTAL COST</span>
+          <span className="text-white font-bold text-2xl">${totalCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         </div>
-        <div className="flex flex-row items-center justify-center w-[500px] mt-2 h-[50px] sm:h-[70px] border-amber-500 bg-amber-100 border-2 font-bold py-1 px-3 rounded-lg shadow">
-          <div className="font-bold mr-1">MAX POWER CONSUMPTION = </div>
-          {(
-            (totalNetworkConsumption + totalServerConsumption) *
-            pue
-          ).toLocaleString("en-US", { maximumFractionDigits: 0 })}{" "}
-          W
+        <div className="flex items-center justify-center px-8 py-4 bg-gradient-to-r from-slate-100 to-slate-200 border-2 border-slate-300 rounded-2xl shadow-lg">
+          <span className="text-slate-600 font-bold text-lg mr-3">MAX POWER</span>
+          <span className="text-slate-800 font-bold text-2xl">
+            {((totalNetworkConsumption + totalServerConsumption) * pue).toLocaleString("en-US", { maximumFractionDigits: 0 })} W
+          </span>
         </div>
       </div>
+
+      {/* Pie Charts */}
       <div className="flex flex-wrap justify-center items-center w-full">
         <div className="flex flex-col items-center xl:mr-[100px] 2xl:mr-0 mb-3">
           <h1 className="mb-3 font-bold text-lg">
@@ -798,6 +1264,30 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Scenario TCO Summary - shows when scenario is active */}
+      {currentBreakdown && showScenarioPanel && (
+        <div className="w-full max-w-4xl px-4">
+          <div className="flex flex-wrap justify-center gap-4">
+            <div className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-300 rounded-xl shadow-sm font-semibold">
+              <span className="text-purple-600 mr-2">SCENARIO TCO</span>
+              <span className="text-purple-800 text-xl">
+                ${currentBreakdown.totals.grandTotal.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+            <div className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-300 rounded-xl shadow-sm text-sm font-medium">
+              <span className="text-purple-500 mr-1">Base:</span>
+              <span className="text-purple-800 font-mono">${currentBreakdown.totals.baseTCO.toLocaleString()}</span>
+              <span className="mx-2 text-purple-300">+</span>
+              <span className="text-purple-500 mr-1">Adj:</span>
+              <span className="text-purple-800 font-mono">${currentBreakdown.totals.adjustments.toLocaleString()}</span>
+              <span className="mx-2 text-purple-300">+</span>
+              <span className="text-purple-500 mr-1">Compliance:</span>
+              <span className="text-purple-800 font-mono">${currentBreakdown.totals.compliance.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="mt-12 text-center text-md text-slate-600 dark:text-slate-300">
         <p>
           For more info about the JSON upload feature{" "}
@@ -808,7 +1298,13 @@ export default function Home() {
             click here
           </Link>
         </p>
+        <p className="mt-2 text-sm text-gray-500">
+          Scenario-driven TCO Calculator - Research Artifact
+        </p>
       </footer>
+
+      {/* Help System */}
+      <HelpSystem />
     </main>
   );
 }

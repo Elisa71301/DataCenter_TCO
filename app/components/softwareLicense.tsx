@@ -164,9 +164,9 @@ const SoftwareLicense: React.FC<softwareProps> = ({
           />{" "}
         </div>
       )}
-      <div className="md:w-[400px] w-full border-yellow-500 bg-yellow-100 border-2 font-bold py-1 px-3 rounded-lg mt-4 shadow ml-4 mr-4 md:mr-[10px]">
-        Software License Cost: $
-        {softwareCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+      <div className="flex items-center justify-center w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-300 rounded-xl shadow-sm font-semibold mt-4 ml-4 mr-4">
+        <span className="text-indigo-600 mr-2">Software License Cost:</span>
+        <span className="text-indigo-800">${softwareCost.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
       </div>
       <div className="flex flex-col space-y-1 w-full sm:w-[700px] mb-2 mt-7 xl:mr-[200px] ml-4 items-center mr-4">
         <Box sx={{ width: "100%" }}>
@@ -184,13 +184,13 @@ const SoftwareLicense: React.FC<softwareProps> = ({
                 max={99}
                 sx={{
                   "& .MuiSlider-thumb": {
-                    color: "#38b2ac", // Tailwind teal 500 color
+                    color: "#6366f1", // Tailwind indigo-500
                   },
                   "& .MuiSlider-track": {
-                    color: "#38b2ac", // Tailwind teal 500 color
+                    color: "#6366f1", // Tailwind indigo-500
                   },
                   "& .MuiSlider-rail": {
-                    color: "lightgray", // Light gray track color
+                    color: "#e0e7ff", // Tailwind indigo-100
                   },
                   height: 7,
                 }}

@@ -113,12 +113,13 @@ const Land: React.FC<LandProps> = ({
           <option value="Guided">Guided</option>
           {/* <option value="Customizable">Customizable</option> */}
         </select>
-        <div className="w-full sm:w-[285px] border-sky-500 bg-sky-100 text-center border-2 font-bold py-1 px-3 rounded-lg shadow mb-2 md:mr-[50px]">
-          GOI: {GOI.toFixed(1)} $/ft^2
+        <div className="flex items-center justify-center w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-300 rounded-xl shadow-sm font-semibold mb-2 md:mr-4">
+          <span className="text-amber-600 mr-2">GOI:</span>
+          <span className="text-amber-800">{GOI.toFixed(1)} $/ft²</span>
         </div>
-        <div className="w-full md:w-[535px] xl:w-[450px] border-indigo-500 text-center bg-indigo-100 border-2 font-bold py-1 px-3 rounded-lg shadow mb-2 md:mr-[10px]">
-          Property Value: $
-          {propertyValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+        <div className="flex items-center justify-center w-full md:w-auto px-5 py-2 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-300 rounded-xl shadow-sm font-semibold mb-2">
+          <span className="text-amber-600 mr-2">Property Value:</span>
+          <span className="text-amber-800">${propertyValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
 
